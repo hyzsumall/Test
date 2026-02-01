@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>躲避类小游戏</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #0b0f14;
+      color: #e6e6e6;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      height: 100%;
+    }
+    #game {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      background: #0b0f14;
+    }
+    .hud {
+      position: fixed;
+      left: 16px;
+      top: 12px;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+      color: #cfd8dc;
+      user-select: none;
+      line-height: 1.6;
+    }
+    .hint {
+      color: #90a4ae;
+      font-size: 12px;
+      margin-top: 6px;
+    }
+    .center {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: #eceff1;
+      pointer-events: none;
+    }
+    .center .title {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+    .center .sub {
+      font-size: 14px;
+      color: #90a4ae;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <div class="hud" id="hud">
+    分数：0.0
+    <div class="hint">WASD / 方向键移动 ｜ P 暂停 ｜ R 重开</div>
+  </div>
+  <div class="center" id="centerTip">
+    <div class="title">按任意方向键开始</div>
+    <div class="sub">活得更久，分数更高</div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const hud = document.getElementById("hud");
+    const centerTip = document.getElementById("centerTip");
+
+    const state = {
+      running: false,
+      paused: false,
+      gameOver: false,
+      startTime: 0,
+      elapsed: 0,
+      lastTime: 0,
+      spawnTimer: 0,
+      obstacles: [],
+      difficulty: 1
+    };
+
+    const player = {
+      x: 0,
+      y: 0,
+      r: 7,
+      vx: 0,
+      vy: 0,
+      ax: 0,
+      ay: 0,
+      accel: 0.55,
+      friction: 0.88,
+      maxSpeed: 6.2,
+      color: "#4dd0e1"
+    };
+
+    const keys = {
+      up: false, down: false, left: false, right: false
+    };
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      if (!state.running) {
+        player.x = canvas.width / 2;
+        player.y = canvas.height / 2;
+      }
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    function resetGame() {
+      state.running = true;
+      state.paused = false;
+      state.gameOver = false;
+      state.startTime = performance.now();
+      state.elapsed = 0;
+      state.lastTime = performance.now();
+      state.spawnTimer = 0;
+      state.obstacles = [];
+      state.difficulty = 1;
+
+      player.x = canvas.width / 2;
+      player.y = canvas.height / 2;
+      player.vx = 0;
+      player.vy = 0;
+
+      centerTip.style.display = "none";
+    }
+
+    function togglePause() {
+      if (!state.running || state.gameOver) return;
+      state.paused = !state.paused;
+      if (!state.paused) {
+        state.lastTime = performance.now();
+      }
+    }
+
+    function endGame() {
+      state.gameOver = true;
+      state.running = false;
+      centerTip.style.display = "block";
+      centerTip.querySelector(".title").textContent = "游戏结束";
+      centerTip.querySelector(".sub").textContent = "按 R 重开";
+    }
+
+    function handleInput() {
+      player.ax = 0;
+      player.ay = 0;
+      if (keys.left) player.ax -= player.accel;
+      if (keys.right) player.ax += player.accel;
+      if (keys.up) player.ay -= player.accel;
+      if (keys.down) player.ay += player.accel;
+    }
+
+    function updatePlayer() {
+      player.vx += player.ax;
+      player.vy += player.ay;
+
+      player.vx *= player.friction;
+      player.vy *= player.friction;
+
+      const speed = Math.hypot(player.vx, player.vy);
+      if (speed > player.maxSpeed) {
+        const scale = player.maxSpeed / speed;
+        player.vx *= scale;
+        player.vy *= scale;
+      }
+
+      player.x += player.vx;
+      player.y += player.vy;
+
+      const padding = player.r + 2;
+      player.x = Math.max(padding, Math.min(canvas.width - padding, player.x));
+      player.y = Math.max(padding, Math.min(canvas.height - padding, player.y));
+    }
+
+    function spawnObstacle() {
+      const edge = Math.floor(Math.random() * 4);
+      const margin = 40;
+      const r = 10 + Math.random() * 14;
+      let x, y, vx, vy;
+
+      const speedBase = 1.6 + state.difficulty * 0.25;
+      const speed = speedBase + Math.random() * 1.3;
+
+      if (edge === 0) {
+        x = -margin;
+        y = Math.random() * canvas.height;
+        vx = speed;
+        vy = (Math.random() - 0.5) * speed;
+      } else if (edge === 1) {
+        x = canvas.width + margin;
+        y = Math.random() * canvas.height;
+        vx = -speed;
+        vy = (Math.random() - 0.5) * speed;
+      } else if (edge === 2) {
+        x = Math.random() * canvas.width;
+        y = -margin;
+        vx = (Math.random() - 0.5) * speed;
+        vy = speed;
+      } else {
+        x = Math.random() * canvas.width;
+        y = canvas.height + margin;
+        vx = (Math.random() - 0.5) * speed;
+        vy = -speed;
+      }
+
+      state.obstacles.push({ x, y, r, vx, vy });
+    }
+
+    function updateObstacles(dt) {
+      for (const obs of state.obstacles) {
+        obs.x += obs.vx;
+        obs.y += obs.vy;
+      }
+      state.obstacles = state.obstacles.filter(o => 
+        o.x > -100 && o.x < canvas.width + 100 &&
+        o.y > -100 && o.y < canvas.height + 100
+      );
+
+      state.spawnTimer += dt;
+      const spawnInterval = Math.max(0.25, 1.0 - state.difficulty * 0.06);
+      while (state.spawnTimer >= spawnInterval) {
+        spawnObstacle();
+        state.spawnTimer -= spawnInterval;
+      }
+    }
+
+    function checkCollision() {
+      for (const obs of state.obstacles) {
+        const dx = obs.x - player.x;
+        const dy = obs.y - player.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < obs.r + player.r) return true;
+      }
+      return false;
+    }
+
+    function updateDifficulty() {
+      state.difficulty = 1 + state.elapsed / 10;
+    }
+
+    function render() {
+      ctx.fillStyle = "rgba(11, 15, 20, 0.25)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Obstacles
+      for (const obs of state.obstacles) {
+        ctx.beginPath();
+        ctx.fillStyle = "#ff6b6b";
+        ctx.shadowColor = "rgba(255, 107, 107, 0.6)";
+        ctx.shadowBlur = 12;
+        ctx.arc(obs.x, obs.y, obs.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Player
+      ctx.beginPath();
+      ctx.fillStyle = player.color;
+      ctx.shadowColor = "rgba(77, 208, 225, 0.8)";
+      ctx.shadowBlur = 16;
+      ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+    }
+
+    function loop(now) {
+      requestAnimationFrame(loop);
+      if (!state.running || state.paused) return;
+
+      const dt = (now - state.lastTime) / 1000;
+      state.lastTime = now;
+      state.elapsed = (now - state.startTime) / 1000;
+
+      handleInput();
+      updatePlayer();
+      updateDifficulty();
+      updateObstacles(dt);
+
+      if (checkCollision()) {
+        endGame();
+      }
+
+      hud.firstChild.textContent = `分数：${state.elapsed.toFixed(1)}`;
+      render();
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "KeyW" || e.code === "ArrowUp") keys.up = true;
+      if (e.code === "KeyS" || e.code === "ArrowDown") keys.down = true;
+      if (e.code === "KeyA" || e.code === "ArrowLeft") keys.left = true;
+      if (e.code === "KeyD" || e.code === "ArrowRight") keys.right = true;
+
+      if (!state.running && !state.gameOver && (keys.up || keys.down || keys.left || keys.right)) {
+        resetGame();
+      }
+
+      if (e.code === "KeyP") togglePause();
+      if (e.code === "KeyR") {
+        centerTip.querySelector(".title").textContent = "按任意方向键开始";
+        centerTip.querySelector(".sub").textContent = "活得更久，分数更高";
+        resetGame();
+      }
+    });
+
+    window.addEventListener("keyup", (e) => {
+      if (e.code === "KeyW" || e.code === "ArrowUp") keys.up = false;
+      if (e.code === "KeyS" || e.code === "ArrowDown") keys.down = false;
+      if (e.code === "KeyA" || e.code === "ArrowLeft") keys.left = false;
+      if (e.code === "KeyD" || e.code === "ArrowRight") keys.right = false;
+    });
+
+    // 初始画面
+    ctx.fillStyle = "#0b0f14";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
