@@ -98,6 +98,10 @@
             color: #7b2cbf;
         }
 
+        .stat-card.sandisk .value {
+            color: #ff6b35;
+        }
+
         .charts-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
@@ -228,6 +232,16 @@
                 <div class="value">2.8%</div>
                 <div class="change positive">强劲增长</div>
             </div>
+            <div class="stat-card sandisk">
+                <h3>SanDisk 当前股价</h3>
+                <div class="value">$72.50</div>
+                <div class="change positive">↑ 60.4% 年度增长</div>
+            </div>
+            <div class="stat-card sandisk">
+                <h3>SanDisk 平均月增速</h3>
+                <div class="value">4.5%</div>
+                <div class="change positive">强劲增长</div>
+            </div>
         </div>
 
         <div class="charts-grid">
@@ -261,6 +275,8 @@
                         <th>NAND 增速</th>
                         <th>DRAM 价格 ($)</th>
                         <th>DRAM 增速</th>
+                        <th>SanDisk 股价 ($)</th>
+                        <th>SanDisk 增速</th>
                     </tr>
                 </thead>
                 <tbody id="dataTableBody">
@@ -283,6 +299,9 @@
         // DRAM 价格数据（模拟2025年走势）
         const dramPrices = [2.16, 2.25, 2.35, 2.42, 2.52, 2.60, 2.68, 2.75, 2.82, 2.88, 2.90, 2.92];
 
+        // SanDisk 股价数据（模拟2025年走势，单位：美元）
+        const sandiskPrices = [45.20, 47.80, 49.50, 52.30, 55.10, 53.80, 56.40, 59.20, 61.50, 64.80, 68.20, 72.50];
+
         // 计算月度增速
         function calculateGrowthRates(prices) {
             const rates = [0];
@@ -301,8 +320,10 @@
 
         const nandGrowth = calculateGrowthRates(nandPrices);
         const dramGrowth = calculateGrowthRates(dramPrices);
+        const sandiskGrowth = calculateGrowthRates(sandiskPrices);
         const nandCumulative = calculateCumulativeGrowth(nandPrices);
         const dramCumulative = calculateCumulativeGrowth(dramPrices);
+        const sandiskCumulative = calculateCumulativeGrowth(sandiskPrices);
 
         // 通用图表配置
         const chartOptions = {
@@ -344,7 +365,8 @@
                         fill: true,
                         tension: 0.4,
                         pointRadius: 4,
-                        pointHoverRadius: 6
+                        pointHoverRadius: 6,
+                        yAxisID: 'y'
                     },
                     {
                         label: 'DRAM 价格 ($/GB)',
@@ -354,20 +376,68 @@
                         fill: true,
                         tension: 0.4,
                         pointRadius: 4,
-                        pointHoverRadius: 6
+                        pointHoverRadius: 6,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'SanDisk 股价 ($)',
+                        data: sandiskPrices,
+                        borderColor: '#ff6b35',
+                        backgroundColor: 'rgba(255, 107, 53, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        yAxisID: 'y1'
                     }
                 ]
             },
             options: {
-                ...chartOptions,
+                responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
-                    ...chartOptions.plugins,
+                    legend: {
+                        labels: {
+                            color: '#fff',
+                            font: { size: 12 }
+                        }
+                    },
                     tooltip: {
                         callbacks: {
                             label: function(context) {
                                 return `${context.dataset.label}: $${context.raw.toFixed(2)}`;
                             }
                         }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#a0a0a0' },
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'NAND/DRAM 价格 ($/GB)',
+                            color: '#a0a0a0'
+                        },
+                        ticks: { color: '#a0a0a0' },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'SanDisk 股价 ($)',
+                            color: '#ff6b35'
+                        },
+                        ticks: { color: '#ff6b35' },
+                        grid: { drawOnChartArea: false }
                     }
                 }
             }
@@ -391,6 +461,13 @@
                         data: dramGrowth,
                         backgroundColor: 'rgba(123, 44, 191, 0.7)',
                         borderColor: '#7b2cbf',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'SanDisk 月增速 (%)',
+                        data: sandiskGrowth,
+                        backgroundColor: 'rgba(255, 107, 53, 0.7)',
+                        borderColor: '#ff6b35',
                         borderWidth: 1
                     }
                 ]
@@ -435,6 +512,16 @@
                         tension: 0.4,
                         pointRadius: 5,
                         pointHoverRadius: 7
+                    },
+                    {
+                        label: 'SanDisk 累计增长率 (%)',
+                        data: sandiskCumulative,
+                        borderColor: '#ff6b35',
+                        backgroundColor: 'rgba(255, 107, 53, 0.2)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
                     }
                 ]
             },
@@ -459,8 +546,10 @@
             const row = document.createElement('tr');
             const nandGrowthClass = nandGrowth[i] >= 0 ? 'positive-cell' : 'negative-cell';
             const dramGrowthClass = dramGrowth[i] >= 0 ? 'positive-cell' : 'negative-cell';
+            const sandiskGrowthClass = sandiskGrowth[i] >= 0 ? 'positive-cell' : 'negative-cell';
             const nandGrowthSymbol = nandGrowth[i] >= 0 ? '↑' : '↓';
             const dramGrowthSymbol = dramGrowth[i] >= 0 ? '↑' : '↓';
+            const sandiskGrowthSymbol = sandiskGrowth[i] >= 0 ? '↑' : '↓';
 
             row.innerHTML = `
                 <td>2025年${months[i]}</td>
@@ -468,6 +557,8 @@
                 <td class="${nandGrowthClass}">${nandGrowthSymbol} ${Math.abs(nandGrowth[i]).toFixed(2)}%</td>
                 <td>$${dramPrices[i].toFixed(2)}</td>
                 <td class="${dramGrowthClass}">${dramGrowthSymbol} ${Math.abs(dramGrowth[i]).toFixed(2)}%</td>
+                <td>$${sandiskPrices[i].toFixed(2)}</td>
+                <td class="${sandiskGrowthClass}">${sandiskGrowthSymbol} ${Math.abs(sandiskGrowth[i]).toFixed(2)}%</td>
             `;
             tableBody.appendChild(row);
         }
